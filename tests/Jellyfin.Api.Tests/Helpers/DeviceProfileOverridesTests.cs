@@ -61,7 +61,7 @@ namespace Jellyfin.Api.Tests.Helpers
             const string Json = """
                 {"Overrides": [{"DeviceId": "tv-1", "RemoveAudioCodecs": ["truehd"], "PreferAudioCodecs": ["eac3", "ac3"]}]}
                 """;
-            var profile = CreateOverrides(Json).Apply(CreateProfile(), "tv-1", "Some Client");
+            var profile = CreateOverrides(Json).Apply(CreateProfile(), "tv-1", "Some Client", out _);
 
             Assert.Equal("aac,ac3,eac3", profile.DirectPlayProfiles[0].AudioCodec);
             Assert.Equal("none", profile.DirectPlayProfiles[1].AudioCodec);
@@ -76,7 +76,7 @@ namespace Jellyfin.Api.Tests.Helpers
             const string Json = """
                 {"Overrides": [{"DeviceId": "tv-1", "Client": "Some Client", "RemoveAudioCodecs": ["truehd"]}]}
                 """;
-            var profile = CreateOverrides(Json).Apply(CreateProfile(), "tv-1", "Other Client");
+            var profile = CreateOverrides(Json).Apply(CreateProfile(), "tv-1", "Other Client", out _);
 
             Assert.Equal("aac,ac3,eac3,truehd", profile.DirectPlayProfiles[0].AudioCodec);
             Assert.Equal("aac,ac3,eac3,truehd", profile.TranscodingProfiles[0].AudioCodec);
@@ -85,9 +85,44 @@ namespace Jellyfin.Api.Tests.Helpers
         [Fact]
         public void Apply_NoFile_LeavesProfileUntouched()
         {
-            var profile = CreateOverrides(null).Apply(CreateProfile(), "tv-1", "Some Client");
+            var profile = CreateOverrides(null).Apply(CreateProfile(), "tv-1", "Some Client", out _);
 
             Assert.Equal("aac,ac3,eac3,truehd", profile.DirectPlayProfiles[0].AudioCodec);
+        }
+
+        [Fact]
+        public void Apply_RemovingCodecs_ReportsRemoval()
+        {
+            const string Json = """
+                {"Overrides": [{"DeviceId": "tv-1", "RemoveAudioCodecs": ["truehd"]}]}
+                """;
+            CreateOverrides(Json).Apply(CreateProfile(), "tv-1", "Some Client", out var removed);
+
+            Assert.True(removed);
+        }
+
+        [Fact]
+        public void Apply_OtherDevice_ReportsNoRemoval()
+        {
+            const string Json = """
+                {"Overrides": [{"DeviceId": "tv-1", "RemoveAudioCodecs": ["truehd"]}]}
+                """;
+            CreateOverrides(Json).Apply(CreateProfile(), "tv-2", "Some Client", out var removed);
+
+            Assert.False(removed);
+        }
+
+        [Fact]
+        public void Apply_ReorderingOnly_ReportsNoRemoval()
+        {
+            // Reordering must not report a removal: the caller pins the audio index on a removal,
+            // and an entry that only reorders has taken nothing away to pin around.
+            const string Json = """
+                {"Overrides": [{"DeviceId": "tv-1", "PreferAudioCodecs": ["eac3"]}]}
+                """;
+            CreateOverrides(Json).Apply(CreateProfile(), "tv-1", "Some Client", out var removed);
+
+            Assert.False(removed);
         }
     }
 }

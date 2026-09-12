@@ -204,7 +204,11 @@ public class MediaInfoHelper
         bool alwaysBurnInSubtitleWhenTranscoding,
         IPAddress ipAddress)
     {
-        profile = _deviceProfileOverrides.Apply(profile, claimsPrincipal.GetDeviceId(), claimsPrincipal.GetClient());
+        profile = _deviceProfileOverrides.Apply(
+            profile,
+            claimsPrincipal.GetDeviceId(),
+            claimsPrincipal.GetClient(),
+            out var removedAudioCodecs);
         var streamBuilder = new StreamBuilder(_mediaEncoder, _logger);
 
         var options = new MediaOptions
@@ -225,6 +229,16 @@ public class MediaInfoHelper
             options.MediaSourceId = mediaSourceId;
             options.AudioStreamIndex = audioStreamIndex;
             options.SubtitleStreamIndex = subtitleStreamIndex;
+        }
+
+        // Stripping a codec only forces a transcode of the intended track when the stream builder
+        // cannot reselect around it. With no explicit index it is free to pick any other stream
+        // whose codec survived the strip, and it matches on codec alone, so a client that declares
+        // no audio codec list at all ends up on a different language. Pinning the index the server
+        // already resolved keeps the track and turns the strip into a transcode.
+        if (removedAudioCodecs && options.AudioStreamIndex is null)
+        {
+            options.AudioStreamIndex = mediaSource.DefaultAudioStreamIndex;
         }
 
         var user = _userManager.GetUserById(userId) ?? throw new ResourceNotFoundException();

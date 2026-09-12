@@ -44,9 +44,12 @@ public class DeviceProfileOverrides
     /// <param name="profile">The device profile sent by the client.</param>
     /// <param name="deviceId">The device id of the requesting client.</param>
     /// <param name="client">The client name of the requesting client.</param>
+    /// <param name="removedAudioCodecs">Whether a matching entry stripped audio codecs, in which
+    /// case the caller must pin the audio stream so the stream builder cannot reselect around it.</param>
     /// <returns>The same profile instance, modified in place.</returns>
-    public DeviceProfile Apply(DeviceProfile profile, string? deviceId, string? client)
+    public DeviceProfile Apply(DeviceProfile profile, string? deviceId, string? client, out bool removedAudioCodecs)
     {
+        removedAudioCodecs = false;
         var entries = Load();
         if (entries.Length > 0)
         {
@@ -59,6 +62,8 @@ public class DeviceProfileOverrides
             {
                 continue;
             }
+
+            removedAudioCodecs |= entry.RemoveAudioCodecs.Length > 0;
 
             foreach (var directPlay in profile.DirectPlayProfiles)
             {
