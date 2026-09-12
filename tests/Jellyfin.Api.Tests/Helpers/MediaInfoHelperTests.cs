@@ -1,10 +1,12 @@
 using System;
 using System.Globalization;
+using System.IO;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Api.Helpers;
 using Jellyfin.Database.Implementations.Entities;
+using MediaBrowser.Common.Configuration;
 using MediaBrowser.Common.Net;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Configuration;
@@ -35,6 +37,9 @@ namespace Jellyfin.Api.Tests.Helpers
             serverConfigurationManager
                 .Setup(x => x.GetConfiguration(It.IsAny<string>()))
                 .Returns(new NetworkConfiguration { BaseUrl = baseUrl });
+            serverConfigurationManager
+                .Setup(x => x.CommonApplicationPaths)
+                .Returns(Mock.Of<IApplicationPaths>(p => p.ConfigurationDirectoryPath == Path.GetTempPath()));
 
             return new MediaInfoHelper(
                 Mock.Of<IUserManager>(),
@@ -45,7 +50,8 @@ namespace Jellyfin.Api.Tests.Helpers
                 Mock.Of<ILogger<MediaInfoHelper>>(),
                 Mock.Of<INetworkManager>(),
                 Mock.Of<IDeviceManager>(),
-                appHost ?? Mock.Of<IServerApplicationHost>());
+                appHost ?? Mock.Of<IServerApplicationHost>(),
+                new DeviceProfileOverrides(serverConfigurationManager.Object, Mock.Of<ILogger<DeviceProfileOverrides>>()));
         }
 
         private static MediaSourceInfo CreateSource(Guid itemId, int bitrate, bool supportsDirectPlay = true)

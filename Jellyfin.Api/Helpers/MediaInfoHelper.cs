@@ -46,6 +46,7 @@ public class MediaInfoHelper
     private readonly INetworkManager _networkManager;
     private readonly IDeviceManager _deviceManager;
     private readonly IServerApplicationHost _appHost;
+    private readonly DeviceProfileOverrides _deviceProfileOverrides;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MediaInfoHelper"/> class.
@@ -59,6 +60,7 @@ public class MediaInfoHelper
     /// <param name="networkManager">Instance of the <see cref="INetworkManager"/> interface.</param>
     /// <param name="deviceManager">Instance of the <see cref="IDeviceManager"/> interface.</param>
     /// <param name="appHost">Instance of the <see cref="IServerApplicationHost"/> interface.</param>
+    /// <param name="deviceProfileOverrides">Instance of the <see cref="DeviceProfileOverrides"/> class.</param>
     public MediaInfoHelper(
         IUserManager userManager,
         ILibraryManager libraryManager,
@@ -68,8 +70,10 @@ public class MediaInfoHelper
         ILogger<MediaInfoHelper> logger,
         INetworkManager networkManager,
         IDeviceManager deviceManager,
-        IServerApplicationHost appHost)
+        IServerApplicationHost appHost,
+        DeviceProfileOverrides deviceProfileOverrides)
     {
+        _deviceProfileOverrides = deviceProfileOverrides;
         _userManager = userManager;
         _libraryManager = libraryManager;
         _mediaSourceManager = mediaSourceManager;
@@ -200,6 +204,7 @@ public class MediaInfoHelper
         bool alwaysBurnInSubtitleWhenTranscoding,
         IPAddress ipAddress)
     {
+        profile = _deviceProfileOverrides.Apply(profile, claimsPrincipal.GetDeviceId(), claimsPrincipal.GetClient());
         var streamBuilder = new StreamBuilder(_mediaEncoder, _logger);
 
         var options = new MediaOptions
