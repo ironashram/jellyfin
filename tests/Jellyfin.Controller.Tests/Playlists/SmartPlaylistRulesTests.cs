@@ -32,9 +32,6 @@ public class SmartPlaylistRulesTests
         Assert.False(SmartPlaylistRules.Matches(rule, ["Hip Hop"], [], null));
     }
 
-    /// <summary>
-    /// The Cinematic rule: a genre substring or an album artist, either one alone is enough.
-    /// </summary>
     [Fact]
     public void Matches_IncludesAcrossFields_AreOred()
     {
@@ -49,9 +46,6 @@ public class SmartPlaylistRulesTests
         Assert.False(SmartPlaylistRules.Matches(rule, ["Soundtrack"], ["Hans Zimmer"], null));
     }
 
-    /// <summary>
-    /// The Heavy Metal rule: an exact exclusion and a substring exclusion, both beating the include.
-    /// </summary>
     [Fact]
     public void Matches_Exclusions_BeatIncludes()
     {
@@ -67,10 +61,6 @@ public class SmartPlaylistRulesTests
         Assert.False(SmartPlaylistRules.Matches(rule, ["Heavy Metal", "Progressive Metal"], [], null));
     }
 
-    /// <summary>
-    /// The Electronic rule's album exclusion, which drops the soundtrack from an otherwise
-    /// matching genre.
-    /// </summary>
     [Fact]
     public void Matches_ExcludedAlbum_Rejects()
     {
@@ -94,6 +84,29 @@ public class SmartPlaylistRulesTests
     }
 
     [Fact]
+    public void Matches_MultiGenreTag_IsSplit()
+    {
+        var rule = new SmartPlaylistRule { Genres = ["Heavy Metal"] };
+
+        Assert.True(SmartPlaylistRules.Matches(rule, ["Hard Rock;Heavy Metal;Metal;Rock"], [], null));
+        Assert.True(SmartPlaylistRules.Matches(rule, ["Hard Rock; Heavy Metal; Rock"], [], null));
+        Assert.False(SmartPlaylistRules.Matches(rule, ["Hard Rock;Metal;Rock"], [], null));
+    }
+
+    [Fact]
+    public void Matches_MultiGenreTag_ExclusionSeesEveryPart()
+    {
+        var rule = new SmartPlaylistRule
+        {
+            Genres = ["Heavy Metal"],
+            ExcludeGenres = ["Nu Metal"],
+        };
+
+        Assert.False(SmartPlaylistRules.Matches(rule, ["Heavy Metal;Nu Metal;Rock"], [], null));
+        Assert.True(SmartPlaylistRules.Matches(rule, ["Heavy Metal;Thrash Metal"], [], null));
+    }
+
+    [Fact]
     public void Matches_MissingTags_DoNotThrow()
     {
         var rule = new SmartPlaylistRule { Genres = ["Celtic"], ExcludeAlbumContains = ["x"] };
@@ -101,11 +114,6 @@ public class SmartPlaylistRulesTests
         Assert.False(SmartPlaylistRules.Matches(rule, null, null, null));
     }
 
-    /// <summary>
-    /// The guard the whole design rests on: with no rules file, every playlist name resolves to no
-    /// rule, so an ordinary playlist keeps reading the tracks stored on it. A smart playlist that
-    /// silently captured ordinary playlists would empty them.
-    /// </summary>
     [Fact]
     public void For_WithoutConfiguration_ReturnsNoRule()
     {

@@ -3,7 +3,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using Jellyfin.Data.Enums;
@@ -16,14 +15,6 @@ namespace MediaBrowser.Controller.Playlists;
 
 /// <summary>
 /// Rule backed playlists, read from smart-playlists.json in the configuration directory.
-///
-/// A playlist whose name matches an entry resolves its contents from the rule every time it is
-/// read, instead of from the tracks stored on it. Nothing is written: the playlist item itself is
-/// created by hand once, and the server never creates, deletes or refreshes anything.
-///
-/// Every failure path returns no rule, which leaves the playlist on the stored-tracks path it
-/// takes today. A missing file, malformed json or an unreadable path must never change how an
-/// ordinary playlist behaves.
 /// </summary>
 public static class SmartPlaylistRules
 {
@@ -73,13 +64,6 @@ public static class SmartPlaylistRules
             IsFolder = false,
         };
 
-        // Narrow in the database when the rule names exact genres, which all but one of ours do.
-        // A rule matching on substrings has to see every track, so it falls through to the scan.
-        if (rule.Genres.Length > 0)
-        {
-            query.Genres = rule.Genres;
-        }
-
         if (rule.Favorites)
         {
             query.IsFavorite = true;
@@ -111,11 +95,7 @@ public static class SmartPlaylistRules
     }
 
     /// <summary>
-    /// Resolves a rule into the shape the playlist items endpoint expects.
-    ///
-    /// That endpoint reads a playlist through <see cref="Playlist.GetManageableItems"/>, which
-    /// returns the tracks stored on it, so a rule backed playlist has to supply the same pairing
-    /// with a linked child synthesized per item.
+    /// Resolves a rule into the item and linked child pairing the playlist items endpoint expects.
     /// </summary>
     /// <param name="rule">The rule to resolve.</param>
     /// <param name="user">The user the playlist is being read for.</param>
@@ -133,12 +113,8 @@ public static class SmartPlaylistRules
     }
 
     /// <summary>
-    /// Whether an item's tags satisfy a rule. Kept free of item types so the semantics can be
-    /// tested directly.
-    ///
-    /// Include terms are OR'd across every include field: an item needs to match only one of them.
-    /// A rule with no include terms accepts everything, leaving the exclusions to narrow it.
-    /// Any exclusion match rejects the item outright.
+    /// Whether an item's tags satisfy a rule. Include terms are OR'd across every include field,
+    /// a rule with none accepts everything, and any exclusion match rejects the item.
     /// </summary>
     /// <param name="rule">The rule to apply.</param>
     /// <param name="genres">The item's genres.</param>
@@ -147,11 +123,11 @@ public static class SmartPlaylistRules
     /// <returns>True when the item belongs in the playlist.</returns>
     public static bool Matches(SmartPlaylistRule rule, IReadOnlyList<string>? genres, IReadOnlyList<string>? albumArtists, string? album)
     {
-        genres ??= [];
+        var parts = SplitGenres(genres);
         albumArtists ??= [];
 
-        if (AnyEquals(genres, rule.ExcludeGenres)
-            || AnyContains(genres, rule.ExcludeGenreContains)
+        if (AnyEquals(parts, rule.ExcludeGenres)
+            || AnyContains(parts, rule.ExcludeGenreContains)
             || Contains(album, rule.ExcludeAlbumContains))
         {
             return false;
@@ -163,8 +139,8 @@ public static class SmartPlaylistRules
             return true;
         }
 
-        return AnyEquals(genres, rule.Genres)
-            || AnyContains(genres, rule.GenreContains)
+        return AnyEquals(parts, rule.Genres)
+            || AnyContains(parts, rule.GenreContains)
             || AnyContains(albumArtists, rule.AlbumArtistContains);
     }
 
@@ -216,6 +192,34 @@ public static class SmartPlaylistRules
 
     private static string? AlbumOf(BaseItem item)
         => item is Audio audio ? audio.Album : null;
+
+    private static IReadOnlyList<string> SplitGenres(IReadOnlyList<string>? genres)
+    {
+        if (genres is null || genres.Count == 0)
+        {
+            return [];
+        }
+
+        var split = new List<string>(genres.Count);
+        foreach (var genre in genres)
+        {
+            if (string.IsNullOrEmpty(genre))
+            {
+                continue;
+            }
+
+            if (genre.Contains(';', StringComparison.Ordinal))
+            {
+                split.AddRange(genre.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            }
+            else
+            {
+                split.Add(genre);
+            }
+        }
+
+        return split;
+    }
 
     private static bool AnyEquals(IReadOnlyList<string> values, string[] terms)
     {

@@ -167,8 +167,6 @@ namespace MediaBrowser.Controller.Playlists
 
             query.IsFolder = false;
 
-            // A playlist named by smart-playlists.json resolves from its rule on every read. Any
-            // other playlist, and any failure to read that file, falls through to the stored tracks.
             var rule = SmartPlaylistRules.For(Name);
             if (rule is not null)
             {

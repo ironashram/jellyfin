@@ -539,9 +539,6 @@ public class PlaylistsController : BaseJellyfinApiController
 
         var user = _userManager.GetUserById(callingUserId);
 
-        // A playlist named by smart-playlists.json resolves from its rule on every read. Reading is
-        // the only path that does: adding, removing and reordering still address stored tracks, so
-        // the management side is left exactly as it is.
         var smartRule = SmartPlaylistRules.For(playlist.Name);
         var manageable = smartRule is null
             ? playlist.GetManageableItems()
