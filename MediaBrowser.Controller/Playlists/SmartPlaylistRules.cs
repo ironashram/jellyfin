@@ -111,6 +111,28 @@ public static class SmartPlaylistRules
     }
 
     /// <summary>
+    /// Resolves a rule into the shape the playlist items endpoint expects.
+    ///
+    /// That endpoint reads a playlist through <see cref="Playlist.GetManageableItems"/>, which
+    /// returns the tracks stored on it, so a rule backed playlist has to supply the same pairing
+    /// with a linked child synthesized per item.
+    /// </summary>
+    /// <param name="rule">The rule to resolve.</param>
+    /// <param name="user">The user the playlist is being read for.</param>
+    /// <returns>The selected items, each paired with a linked child naming it.</returns>
+    public static IReadOnlyList<Tuple<LinkedChild, BaseItem>> ResolveManageable(SmartPlaylistRule rule, User? user)
+    {
+        var items = Resolve(rule, user);
+        var pairs = new List<Tuple<LinkedChild, BaseItem>>(items.Count);
+        foreach (var item in items)
+        {
+            pairs.Add(new Tuple<LinkedChild, BaseItem>(LinkedChild.Create(item), item));
+        }
+
+        return pairs;
+    }
+
+    /// <summary>
     /// Whether an item's tags satisfy a rule. Kept free of item types so the semantics can be
     /// tested directly.
     ///
