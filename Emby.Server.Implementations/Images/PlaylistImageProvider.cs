@@ -48,6 +48,11 @@ namespace Emby.Server.Implementations.Images
                         }
                     }
 
+                    if (subItem is Audio audio && audio.AlbumEntity is { } album && album.HasImage(ImageType.Primary))
+                    {
+                        return album;
+                    }
+
                     if (subItem.HasImage(ImageType.Primary))
                     {
                         return subItem;
