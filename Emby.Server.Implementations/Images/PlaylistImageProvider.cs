@@ -9,6 +9,7 @@ using MediaBrowser.Controller.Drawing;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Audio;
 using MediaBrowser.Controller.Entities.TV;
+using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Playlists;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
@@ -18,15 +19,22 @@ namespace Emby.Server.Implementations.Images
 {
     public class PlaylistImageProvider : BaseDynamicImageProvider<Playlist>
     {
-        public PlaylistImageProvider(IFileSystem fileSystem, IProviderManager providerManager, IApplicationPaths applicationPaths, IImageProcessor imageProcessor) : base(fileSystem, providerManager, applicationPaths, imageProcessor)
+        private readonly IUserManager _userManager;
+
+        public PlaylistImageProvider(IFileSystem fileSystem, IProviderManager providerManager, IApplicationPaths applicationPaths, IImageProcessor imageProcessor, IUserManager userManager) : base(fileSystem, providerManager, applicationPaths, imageProcessor)
         {
+            _userManager = userManager;
         }
 
         protected override IReadOnlyList<BaseItem> GetItemsWithImages(BaseItem item)
         {
             var playlist = (Playlist)item;
+            var rule = SmartPlaylistRules.For(playlist.Name);
+            var entries = rule is null
+                ? playlist.GetManageableItems()
+                : SmartPlaylistRules.ResolveManageable(rule, _userManager.GetUserById(playlist.OwnerUserId));
 
-            return playlist.GetManageableItems()
+            return entries
                 .Select(i =>
                 {
                     var subItem = i.Item2;
