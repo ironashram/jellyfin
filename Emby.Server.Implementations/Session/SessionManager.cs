@@ -48,6 +48,8 @@ namespace Emby.Server.Implementations.Session
     /// </summary>
     public sealed class SessionManager : ISessionManager, IAsyncDisposable
     {
+        private static readonly TimeSpan _liveStreamReconnectGracePeriod = TimeSpan.FromSeconds(60);
+
         private readonly IUserDataManager _userDataManager;
         private readonly IServerConfigurationManager _config;
         private readonly ILogger<SessionManager> _logger;
@@ -307,18 +309,32 @@ namespace Emby.Server.Implementations.Session
         /// <inheritdoc />
         public async Task CloseIfNeededAsync(SessionInfo session)
         {
-            if (!session.SessionControllers.Any(i => i.IsSessionActive))
+            if (session.SessionControllers.Any(i => i.IsSessionActive))
             {
-                var key = GetSessionKey(session.Client, session.DeviceId, session.UserId);
-
-                _activeConnections.TryRemove(key, out _);
-                if (!string.IsNullOrEmpty(session.PlayState?.LiveStreamId))
-                {
-                    await CloseLiveStreamIfNeededAsync(session.PlayState.LiveStreamId, session.Id).ConfigureAwait(false);
-                }
-
-                await OnSessionEnded(session).ConfigureAwait(false);
+                return;
             }
+
+            var key = GetSessionKey(session.Client, session.DeviceId, session.UserId);
+
+            if (!string.IsNullOrEmpty(session.PlayState?.LiveStreamId))
+            {
+                await Task.Delay(_liveStreamReconnectGracePeriod).ConfigureAwait(false);
+                if (_disposed
+                    || session.SessionControllers.Any(i => i.IsSessionActive)
+                    || !_activeConnections.TryGetValue(key, out var current)
+                    || !ReferenceEquals(current, session))
+                {
+                    return;
+                }
+            }
+
+            _activeConnections.TryRemove(key, out _);
+            if (!string.IsNullOrEmpty(session.PlayState?.LiveStreamId))
+            {
+                await CloseLiveStreamIfNeededAsync(session.PlayState.LiveStreamId, session.Id).ConfigureAwait(false);
+            }
+
+            await OnSessionEnded(session).ConfigureAwait(false);
         }
 
         /// <inheritdoc />
