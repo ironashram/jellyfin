@@ -862,7 +862,13 @@ namespace Emby.Server.Implementations.Session
             var data = _userDataManager.GetUserData(user, item);
 
             data.PlayCount++;
-            data.LastPlayedDate = DateTime.UtcNow;
+
+            // Re-watching a played item only counts once a progress or stop report gets past the resume threshold,
+            // otherwise rewatch Next Up moves on from an episode that was barely started
+            if (!data.Played || !item.SupportsPositionTicksResume)
+            {
+                data.LastPlayedDate = DateTime.UtcNow;
+            }
 
             if (item.SupportsPlayedStatus && !item.SupportsPositionTicksResume)
             {
@@ -988,7 +994,12 @@ namespace Emby.Server.Implementations.Session
 
             if (positionTicks.HasValue)
             {
-                _userDataManager.UpdatePlayState(item, data, positionTicks.Value);
+                var playedToCompletion = _userDataManager.UpdatePlayState(item, data, positionTicks.Value);
+                if (playedToCompletion || data.PlaybackPositionTicks > 0)
+                {
+                    data.LastPlayedDate = DateTime.UtcNow;
+                }
+
                 changed = true;
             }
 
@@ -1190,6 +1201,10 @@ namespace Emby.Server.Implementations.Session
             if (positionTicks.HasValue)
             {
                 playedToCompletion = _userDataManager.UpdatePlayState(item, data, positionTicks.Value);
+                if (playedToCompletion || data.PlaybackPositionTicks > 0)
+                {
+                    data.LastPlayedDate = DateTime.UtcNow;
+                }
             }
             else
             {
@@ -1197,6 +1212,7 @@ namespace Emby.Server.Implementations.Session
                 data.PlayCount++;
                 data.Played = item.SupportsPlayedStatus;
                 data.PlaybackPositionTicks = 0;
+                data.LastPlayedDate = DateTime.UtcNow;
                 playedToCompletion = true;
             }
 
